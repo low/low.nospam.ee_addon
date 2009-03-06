@@ -21,7 +21,7 @@ class Low_nospam_check
 	var $settings		= array();
 
 	var $name			= 'Low NoSpam';
-	var $version		= '1.0';
+	var $version		= '1.0.1';
 	var $description	= 'Anti-spam utility using online services like Akismet and TypePad AntiSpam';
 	var $settings_exist = 'y';
 	var $docs_url		= '';
@@ -209,8 +209,8 @@ class Low_nospam_check
 					
 					// row to insert
 					$data = array(
-						'entry_id'		=> $query->row['gallery_id'],
-						'gallery_id'	=> $IN->GBL('gallery_id') ? $IN->GBL('gallery_id') : 1,
+						'entry_id'		=> $entry_id,
+						'gallery_id'	=> $query->row['gallery_id'],
 						'author_id'		=> $SESS->userdata['member_id'],
 						'name'			=> $this->input['comment_author'],
 						'email'			=> $this->input['comment_author_email'],
