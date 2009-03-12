@@ -19,7 +19,7 @@ if ( ! defined('EXT'))
 class Low_nospam_CP {
 
 	var $name		= 'Low_nospam';
-	var $version	= '1.0.1';
+	var $version	= '1.0.2';
 
 	var $site_id;
 	var $gallery;
@@ -511,14 +511,28 @@ class Low_nospam_CP {
 		global $IN, $LANG, $DSP, $FNS, $DB;
 		
 		// if no comments are posted, go home
-		if ( ! ($IN->GBL('comment_ids','POST')) )
+		if ( ($as == 'spam' && !$IN->GBL('comment_ids','POST')) OR ($as == 'spam' && !$IN->GBL('toggle','POST')) )
 		{
 			return $this->home();
 		}
 		
-		// turn comments into array
-		$comments = explode('|', $IN->GBL('comment_ids','POST'));
+		$comments = array();
 		$type = $IN->GBL('T');
+		
+		// turn comments into array
+		if ($as == 'spam')
+		{
+			$comments = explode('|', $IN->GBL('comment_ids','POST'));	
+		}
+		else
+		{
+			foreach($IN->GBL('toggle','POST') AS $key => $comment_id)
+			{
+				$comments[] = $comment_id;
+				// needed to play nice with the Publish class
+				$_POST['toggle_'.$key] = 'c'.$comment_id;
+			}
+		}
 		 
 		// Get the Low_nospam class
 		if ( ! class_exists('Low_nospam'))
@@ -608,7 +622,8 @@ class Low_nospam_CP {
 				{$sql_where}
 		";
 
-		return $DB->query($sql)->result;
+		$query = $DB->query($sql);
+		return $query;
 	}
 	// END
  
