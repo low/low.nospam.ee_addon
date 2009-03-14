@@ -21,7 +21,7 @@ class Low_nospam_check
 	var $settings		= array();
 
 	var $name			= 'Low NoSpam';
-	var $version		= '1.0.2';
+	var $version		= '1.0.3';
 	var $description	= 'Anti-spam utility using online services like Akismet and TypePad AntiSpam';
 	var $settings_exist = 'y';
 	var $docs_url		= '';
