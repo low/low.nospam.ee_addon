@@ -19,7 +19,7 @@ if ( ! defined('EXT'))
 class Low_nospam_CP {
 
 	var $name		= 'Low_nospam';
-	var $version	= '1.0.2';
+	var $version	= '1.0.3';
 
 	var $site_id;
 	var $gallery;
@@ -511,7 +511,7 @@ class Low_nospam_CP {
 		global $IN, $LANG, $DSP, $FNS, $DB;
 		
 		// if no comments are posted, go home
-		if ( ($as == 'spam' && !$IN->GBL('comment_ids','POST')) OR ($as == 'spam' && !$IN->GBL('toggle','POST')) )
+		if ( ($as == 'spam' && !$IN->GBL('comment_ids','POST')) OR ($as == 'ham' && !$IN->GBL('toggle','POST')) )
 		{
 			return $this->home();
 		}
@@ -623,7 +623,7 @@ class Low_nospam_CP {
 		";
 
 		$query = $DB->query($sql);
-		return $query;
+		return $query->result;
 	}
 	// END
  
@@ -638,7 +638,7 @@ class Low_nospam_CP {
 		
 		$query = $DB->query("UPDATE exp_modules SET module_version = '".$DB->escape_str($this->version)."' WHERE module_name = '".$DB->escape_str($this->name)."'");
 		
-		$FNS->redirect(BASE.AMP.'C=modules'.AMP.'M='.$this->name.AMP.'msg=upgraded');
+		$FNS->redirect(BASE.AMP.'C=modules'.AMP.'M='.$this->name.AMP.'msg=upgrade_successful');
 	}
 	// END
 	
