@@ -19,7 +19,7 @@ if ( ! defined('EXT'))
 class Low_nospam_CP {
 
 	var $name		= 'Low_nospam';
-	var $version	= '1.0.3';
+	var $version	= '1.0.4';
 
 	var $site_id;
 	var $gallery;

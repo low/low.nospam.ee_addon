@@ -21,11 +21,12 @@ class Low_nospam_check
 	var $settings		= array();
 
 	var $name			= 'Low NoSpam';
-	var $version		= '1.0.3';
+	var $version		= '1.0.4';
 	var $description	= 'Anti-spam utility using online services like Akismet and TypePad AntiSpam';
 	var $settings_exist = 'y';
 	var $docs_url		= '';
 	
+	var $default_groups	= array(2, 3, 4);
 	var $input			= array();
 	var $API;
 
@@ -50,17 +51,29 @@ class Low_nospam_check
 	// --------------------------------	
 	function settings()
 	{
-		return array(
+		global $DB;
+		
+		// Get member groups
+		$groups = array();
+		$query = $DB->query("SELECT group_id, group_title FROM exp_member_groups ORDER BY group_title ASC");
+		foreach($query->result AS $row)
+		{
+			$groups[$row['group_id']] = $row['group_title'];
+		}
+		
+		$settings = array(
 			'service'					=> array('s', array('akismet' => "akismet", 'tpas' => "tpas"), 'akismet'),
 			'api_key'					=> '',
+			'check_members'				=> array('ms', $groups, $this->default_groups),
 			'check_comments'			=> array('r', array('y' => "yes", 'n' => "no"), 'y'),
 			'check_gallery_comments'	=> array('r', array('y' => "yes", 'n' => "no"), 'y'),
-			'check_members'				=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
 			'check_forum_posts'			=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
 			'check_wiki_articles'		=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
 			'check_trackbacks'			=> array('r', array('y' => "yes", 'n' => "no"), 'y'),
 			'moderate_if_unreachable'	=> array('r', array('y' => "yes", 'n' => "no"), 'y')
 		);
+		
+		return $settings;
 	}
 	// END settings
 
@@ -74,31 +87,27 @@ class Low_nospam_check
 		global $SESS, $DB;
 		
 		// check settings to see if comment needs to be verified
-		if ($this->settings['check_comments'] == 'y')
+		if ($this->settings['check_comments'] == 'y' AND $this->_check_user())
 		{
-			// Check members too?
-			if (!$SESS->userdata['member_id'] OR ($SESS->userdata['member_id'] AND $this->settings['check_members'] == 'y'))
-			{
-				// Input array
-				$this->input = array(
-					'comment_author'		=> $data['name'],
-					'comment_author_email'	=> $data['email'],
-					'comment_author_url'	=> $data['url'],
-					'comment_content'		=> $data['comment']				
-				);
+			// Input array
+			$this->input = array(
+				'comment_author'		=> $data['name'],
+				'comment_author_email'	=> $data['email'],
+				'comment_author_url'	=> $data['url'],
+				'comment_content'		=> $data['comment']				
+			);
 
-				// Check it!
-				if ($this->is_spam())
-				{
-					// set comment status to 'c' 
-					$data['status'] = 'c';
-					
-					// insert closed comment to DB
-					$DB->query($DB->insert_string('exp_comments', $data));
-					
-					// Exit
-					$this->abort();
-				}
+			// Check it!
+			if ($this->is_spam())
+			{
+				// set comment status to 'c' 
+				$data['status'] = 'c';
+				
+				// insert closed comment to DB
+				$DB->query($DB->insert_string('exp_comments', $data));
+				
+				// Exit
+				$this->abort();
 			}
 		}
 		
@@ -115,7 +124,7 @@ class Low_nospam_check
 	function check_trackback($data)
 	{
 		// check settings to see if trackback needs to be verified
-		if ($this->settings['check_trackbacks'] == 'y')
+		if ($this->settings['check_trackbacks'] == 'y' AND $this->_check_user())
 		{
 			// input array
 			$this->input = array(
@@ -151,7 +160,7 @@ class Low_nospam_check
 		global $SESS, $IN;
 
 		// check settings to see if trackback needs to be verified
-		if ($this->settings['check_forum_posts'] == 'y')
+		if ($this->settings['check_forum_posts'] == 'y' AND $this->_check_user())
 		{
 			// input array
 			$this->input = array(
@@ -185,51 +194,47 @@ class Low_nospam_check
 		global $SESS, $IN, $DB, $LOC;
 		
 		// check settings to see if comment needs to be verified
-		if ($this->settings['check_gallery_comments'] == 'y')
+		if ($this->settings['check_gallery_comments'] == 'y' AND $this->_check_user())
 		{
-			// Check members too?
-			if (!$SESS->userdata['member_id'] OR ($SESS->userdata['member_id'] AND $this->settings['check_members'] == 'y'))
+			// Input array
+			$this->input = array(
+				'comment_author'		=> $SESS->userdata['screen_name']	? $SESS->userdata['screen_name']	: $IN->GBL('name'),
+				'comment_author_email'	=> $SESS->userdata['email']			? $SESS->userdata['email']			: $IN->GBL('email'),
+				'comment_author_url'	=> $SESS->userdata['url']			? $SESS->userdata['url']			: $IN->GBL('url'),
+				'comment_content'		=> $IN->GBL('comment')
+			);
+			
+			// Check it!
+			if ($this->is_spam())
 			{
-				// Input array
-				$this->input = array(
-					'comment_author'		=> $SESS->userdata['screen_name']	? $SESS->userdata['screen_name']	: $IN->GBL('name'),
-					'comment_author_email'	=> $SESS->userdata['email']			? $SESS->userdata['email']			: $IN->GBL('email'),
-					'comment_author_url'	=> $SESS->userdata['url']			? $SESS->userdata['url']			: $IN->GBL('url'),
-					'comment_content'		=> $IN->GBL('comment')
+				// gallery entry id
+				$entry_id = $DB->escape_str($IN->GBL('entry_id'));
+				
+				// get gallery id
+				$query = $DB->query("SELECT gallery_id FROM exp_gallery_entries WHERE entry_id = '{$entry_id}'");
+				
+				// row to insert
+				$data = array(
+					'entry_id'		=> $entry_id,
+					'gallery_id'	=> $query->row['gallery_id'],
+					'author_id'		=> $SESS->userdata['member_id'],
+					'name'			=> $this->input['comment_author'],
+					'email'			=> $this->input['comment_author_email'],
+					'url'			=> $this->input['comment_author_url'],
+					'location'		=> $SESS->userdata['location'] ? $SESS->userdata['location'] : $IN->GBL('location'),
+					'ip_address'	=> $SESS->userdata['ip_address'],
+					'comment_date'	=> $LOC->now,
+					'comment'		=> $this->input['comment_content'],
+					'notify'		=> $IN->GBL('notify_me') ? 'y' : 'n',
+					// Set status to closed
+					'status'		=> 'c'
 				);
 				
-				// Check it!
-				if ($this->is_spam())
-				{
-					// gallery entry id
-					$entry_id = $DB->escape_str($IN->GBL('entry_id'));
-					
-					// get gallery id
-					$query = $DB->query("SELECT gallery_id FROM exp_gallery_entries WHERE entry_id = '{$entry_id}'");
-					
-					// row to insert
-					$data = array(
-						'entry_id'		=> $entry_id,
-						'gallery_id'	=> $query->row['gallery_id'],
-						'author_id'		=> $SESS->userdata['member_id'],
-						'name'			=> $this->input['comment_author'],
-						'email'			=> $this->input['comment_author_email'],
-						'url'			=> $this->input['comment_author_url'],
-						'location'		=> $SESS->userdata['location'] ? $SESS->userdata['location'] : $IN->GBL('location'),
-						'ip_address'	=> $SESS->userdata['ip_address'],
-						'comment_date'	=> $LOC->now,
-						'comment'		=> $this->input['comment_content'],
-						'notify'		=> $IN->GBL('notify_me') ? 'y' : 'n',
-						// Set status to closed
-						'status'		=> 'c'
-					);
-					
-					// insert closed comment to DB
-					$DB->query($DB->insert_string('exp_gallery_comments', $data));
-					
-					// Exit
-					$this->abort();
-				}
+				// insert closed comment to DB
+				$DB->query($DB->insert_string('exp_gallery_comments', $data));
+				
+				// Exit
+				$this->abort();
 			}
 		}
 		
@@ -247,7 +252,7 @@ class Low_nospam_check
 		global $SESS, $IN, $DB;
 		
 		// check settings to see if comment needs to be verified
-		if ($this->settings['check_wiki_articles'] == 'y')
+		if ($this->settings['check_wiki_articles'] == 'y' AND $this->_check_user())
 		{
 			$this->input = array(
 				'user_ip'				=> $SESS->userdata['ip_address'],
@@ -357,6 +362,34 @@ class Low_nospam_check
 
 
 	// --------------------------------
+	//	Check current user
+	// --------------------------------
+	function _check_user()
+	{
+		global $SESS;
+		
+		// Don't check if we don't have to check logged-in members
+		if ($this->settings['check_members'] === 'n' AND $SESS->userdata['member_id'] != 0)
+		{
+			$do_check = FALSE;
+		}
+		// Don't check if user is not in selected member groups
+		elseif (is_array($this->settings['check_members']) AND !in_array($SESS->userdata['group_id'], $this->settings['check_members']))
+		{
+			$do_check = FALSE;
+		}
+		// Every other case, perform check
+		else
+		{
+			$do_check = TRUE;
+		}
+		
+		return $do_check;
+	}
+	//END _check_user
+
+
+	// --------------------------------
 	//	Activate Extension
 	// --------------------------------
 	
@@ -406,7 +439,42 @@ class Low_nospam_check
 		{
 			return FALSE;
 		}
-		
+	    
+		// Update to version 1.0.4
+		// - Change check_members setting from y/n to array of member groups
+		if ($current < '1.0.4')
+		{
+			// Get current settings
+			$query = $DB->query("SELECT settings FROM exp_extensions WHERE class = '".__CLASS__."' LIMIT 1");
+			$settings = unserialize($query->row['settings']);
+			
+			// init member groups
+			$groups = array();
+			
+			// Default member groups if members should not be checked
+			if (!isset($settings['check_members']) OR $settings['check_members'] === 'n')
+			{
+				$groups = $this->default_groups;
+			}
+			// All member groups, except superadmins, if members should be checked
+			else
+			{
+				$query = $DB->query("SELECT group_id FROM exp_member_groups WHERE group_id != 1");
+				foreach($query->result AS $row)
+				{
+					$groups[] = $row['group_id'];
+				}
+			}
+			
+			// update current settings
+			$settings['check_members'] = $groups;
+			$new_settings = $DB->escape_str(serialize($settings));
+			
+			// save new settings to DB
+			$DB->query("UPDATE exp_extensions SET settings = '{$new_settings}' WHERE class = '".__CLASS__."'");
+		}
+	    
+		// default: update version number
 		$DB->query("UPDATE exp_extensions SET version = '{$this->version}' WHERE class = '".__CLASS__."'");
 	}
 	// END update_extension

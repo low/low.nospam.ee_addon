@@ -88,7 +88,7 @@ $L = array(
 "Check comments?",
 
 "check_members" =>
-"Check comments made by registered members?",
+"Member groups to check",
 
 "check_trackbacks" =>
 "Check trackbacks?",
