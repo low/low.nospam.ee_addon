@@ -554,7 +554,7 @@ class Low_nospam_check
 						'class'			=> __CLASS__,
 						'method'		=> 'check_member_registration',
 						'hook'			=> 'member_member_register_start',
-						'settings'		=> '',
+						'settings'		=> $new_settings,
 						'priority'		=> 1,
 						'version'		=> $this->version,
 						'enabled'		=> 'y'
