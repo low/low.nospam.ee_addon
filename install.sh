@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# This script creates symlinks from the local GIT repo into your EE install. It also copies some of the extension icons.
+# This script creates symlinks from the local GIT repo into your EE install.
 
-dirname=`dirname "$0"`
+dirname=`pwd`
 
 echo ""
-echo "You are about to install Low NoSpam"
-echo "-----------------------------------"
+echo "You are about to install Low NoSpam for EE1"
+echo "-------------------------------------------"
 echo ""
 echo "Enter the path to your ExpressionEngine Install without a trailing slash [ENTER]:"
 read ee_path

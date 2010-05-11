@@ -102,14 +102,23 @@ $L = array(
 "check_wiki_articles" =>
 "Check wiki articles?",
 
+"check_member_registrations" =>
+"Check member registrations?",
+
 "moderate_if_unreachable" =>
-"Moderate comments if service is unreachable?",
+"Always flag as spam if service is unreachable?",
 
 "low_nospam_thinks_this_is_spam" =>
 "Computer says your input might be spam, so it will be moderated first.",
 
+"low_nospam_thinks_this_is_spam_discarded" =>
+"Computer says your input might be spam, so it was discarded.",
+
 "service_unreachable" =>
 "Your input cannot be processed right now, so it will be moderated first.",
+
+"service_unreachable_discarded" =>
+"Your input cannot be processed right now, so it was discarded.",
 
 "low_nospam_class_not_found" =>
 "Could not locate the Low NoSpam class. Please install the Low NoSpam module first.",

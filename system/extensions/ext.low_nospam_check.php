@@ -21,7 +21,7 @@ class Low_nospam_check
 	var $settings		= array();
 
 	var $name			= 'Low NoSpam';
-	var $version		= '1.0.4';
+	var $version		= '1.0.5';
 	var $description	= 'Anti-spam utility using online services like Akismet and TypePad AntiSpam';
 	var $settings_exist = 'y';
 	var $docs_url		= '';
@@ -70,6 +70,7 @@ class Low_nospam_check
 			'check_forum_posts'			=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
 			'check_wiki_articles'		=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
 			'check_trackbacks'			=> array('r', array('y' => "yes", 'n' => "no"), 'y'),
+			'check_member_registrations'=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
 			'moderate_if_unreachable'	=> array('r', array('y' => "yes", 'n' => "no"), 'y')
 		);
 		
@@ -94,7 +95,7 @@ class Low_nospam_check
 				'comment_author'		=> $data['name'],
 				'comment_author_email'	=> $data['email'],
 				'comment_author_url'	=> $data['url'],
-				'comment_content'		=> $data['comment']				
+				'comment_content'		=> $data['comment']
 			);
 
 			// Check it!
@@ -176,7 +177,7 @@ class Low_nospam_check
 			if ($this->is_spam())
 			{
 				// No forum post moderation, so just exit
-				$this->abort();
+				$this->abort(TRUE);
 			}
 		}
 
@@ -288,6 +289,52 @@ class Low_nospam_check
 	
 
 
+	// --------------------------------
+	//	Check member registration (method called by extension)
+	// --------------------------------		 
+	function check_member_registration()
+	{
+		global $SESS, $IN, $DB;
+		
+		// check settings to see if comment needs to be verified
+		if ($this->settings['check_member_registrations'] == 'y' AND $this->_check_user())
+		{
+			// Don't send these values to the service
+			$ignore = array('password', 'password_confirm', 'rules', 'email' , 'url', 'username',
+							'XID', 'ACT', 'RET', 'FROM', 'site_id', 'accept_terms');
+			
+			// Init content var
+			$content = '';
+			
+			// Loop through posted data, add to content var
+			foreach ($_POST AS $key => $val)
+			{
+				if (in_array($key, $ignore)) continue;
+				
+				$content .= $val . "\n";
+			}
+			
+			$this->input = array(
+				'user_ip'				=> $SESS->userdata['ip_address'],
+				'user_agent'			=> $SESS->userdata['user_agent'],
+				'comment_author'		=> $IN->GBL('username'),
+				'comment_author_email'	=> $IN->GBL('email'),
+				'comment_author_url'	=> $IN->GBL('url'),
+				'comment_content'		=> $content
+			);
+			
+			// Check it!
+			if ($this->is_spam())
+			{
+				// Exit if spam
+				$this->abort(TRUE);
+			}
+		}
+		
+		// hook doesn't return anything
+	}
+	// END check_member_registration
+
 
 	// --------------------------------
 	//	Check input
@@ -344,15 +391,24 @@ class Low_nospam_check
 	// --------------------------------
 	//	Exit!!!
 	// --------------------------------
-	function abort()
+	function abort($discarded = FALSE)
 	{
 		global $OUT, $LANG, $EXT;
 		
 		// set end_script to true
 		$EXT->end_script = true;
 		
+		$line1 = 'low_nospam_thinks_this_is_spam';
+		$line2 = 'service_unreachable';
+		
+		if ($discarded)
+		{
+			$line1 .= '_discarded';
+			$line2 .= '_discarded';
+		}
+		
 		// return error message
-		$feedback = ($this->API->is_available) ? $LANG->line('low_nospam_thinks_this_is_spam') : $LANG->line('service_unreachable');
+		$feedback = ($this->API->is_available) ? $LANG->line($line1) : $LANG->line($line2);
 		return $OUT->show_user_error('submission', $feedback);
 		
 		// hand break
@@ -403,7 +459,8 @@ class Low_nospam_check
 			'insert_trackback_insert_array'	=> 'check_trackback',
 			'forum_submit_post_start'		=> 'check_forum_post',
 			'gallery_insert_new_comment'	=> 'check_gallery_comment',
-			'edit_wiki_article_end'			=> 'check_wiki_article'
+			'edit_wiki_article_end'			=> 'check_wiki_article',
+			'member_member_register_start'	=> 'check_member_registration'
 		);
 		
 		// insert hooks and methods
@@ -472,6 +529,38 @@ class Low_nospam_check
 			
 			// save new settings to DB
 			$DB->query("UPDATE exp_extensions SET settings = '{$new_settings}' WHERE class = '".__CLASS__."'");
+		}
+		
+		// Upate to version 1.0.5
+		// - Add member registration check
+		if ($current < '1.0.5')
+		{
+			// Get current settings
+			$query = $DB->query("SELECT settings FROM exp_extensions WHERE class = '".__CLASS__."' LIMIT 1");
+			$settings = unserialize($query->row['settings']);
+			
+			// Add new record to settings
+			$settings['check_member_registrations'] = 'n';
+			$new_settings = $DB->escape_str(serialize($settings));
+			
+			// save new settings to DB
+			$DB->query("UPDATE exp_extensions SET settings = '{$new_settings}' WHERE class = '".__CLASS__."'");
+			
+			// Add new hook
+			$DB->query(
+				$DB->insert_string(
+					'exp_extensions', array(
+						'extension_id'	=> '',
+						'class'			=> __CLASS__,
+						'method'		=> 'check_member_registration',
+						'hook'			=> 'member_member_register_start',
+						'settings'		=> '',
+						'priority'		=> 1,
+						'version'		=> $this->version,
+						'enabled'		=> 'y'
+					)
+				)
+			); // end db->query
 		}
 	    
 		// default: update version number
