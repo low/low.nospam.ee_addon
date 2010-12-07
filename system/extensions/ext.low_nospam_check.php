@@ -418,7 +418,8 @@ class Low_nospam_check
 	 * Check Solspace User Member Register
 	 * 
 	 * @access public
-	 * @param  (array) 	Data passed in from extension
+	 * @param  (object) current instance of user
+	 * @param  (array) 	array of errors already found
 	 * @return (array)	Data passed back to freeform
 	 */
 	
@@ -427,6 +428,9 @@ class Low_nospam_check
 		global $EXT, $IN, $SESS;
 		
 		$last_call = ( isset( $EXT->last_call ) AND is_array($EXT->last_call) ) ? $EXT->last_call : $errors;
+		
+		//if there are already errors, we dont need to bother checking
+		if ( ! empty($last_call)) return $last_call;
 		
 		// check settings to see if comment needs to be verified
 		if ($this->settings['check_ss_user_register'] == 'y')
