@@ -71,6 +71,7 @@ class Low_nospam_check
 			'check_wiki_articles'		=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
 			'check_trackbacks'			=> array('r', array('y' => "yes", 'n' => "no"), 'y'),
 			'check_member_registrations'=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
+			'check_freeform_entries'	=> array('r', array('y' => "yes", 'n' => "no"), 'y'),
 			'moderate_if_unreachable'	=> array('r', array('y' => "yes", 'n' => "no"), 'y')
 		);
 		
@@ -336,6 +337,81 @@ class Low_nospam_check
 	// END check_member_registration
 
 
+    // --------------------------------------------------------------------
+	/**
+	 * Check freeform new entry
+	 * 
+	 * @access public
+	 * @param  (array) 	Data passed in from extension
+	 * @return (array)	Data passed back to freeform
+	 */
+	
+	public function check_freeform_entry($data)
+	{
+		global $EXT, $IN, $SESS;
+		
+		$last_call = ( isset( $EXT->last_call ) AND is_array($EXT->last_call) ) ? $EXT->last_call : $data;
+				
+		// check settings to see if comment needs to be verified
+		if ($this->settings['check_freeform_entries'] == 'y')
+		{
+			// Don't send these values to the service
+			$ignore = array(
+				'accept_terms',
+				'author_id',
+				'edit_date',
+				'email' , 
+				'entry_date',
+				'form_name',
+				'FROM', 
+				'group_id',
+				'name',
+				'password', 
+				'password_confirm', 
+				'rules', 
+				'site_id', 
+				'url', 
+				'username',
+				'website',
+			);
+			
+			// Init content var
+			$content = '';
+			
+			// Loop through posted data, add to content var
+			foreach ($data AS $key => $val)
+			{
+				if (in_array($key, $ignore)) continue;
+				
+				$content .= $val . "\n";
+			}
+			
+			//url could come from a lot of places
+			$url = isset($data['url']) ? $data['url'] : (isset($data['website']) ? $data['website'] :  $IN->GBL('url'));
+			
+			$this->input = array(
+				'user_ip'				=> $SESS->userdata['ip_address'],
+				'user_agent'			=> $SESS->userdata['user_agent'],
+				'comment_author'		=> (isset($SESS->userdata['username']) ? $SESS->userdata['username'] : ''),
+				'comment_author_email'	=> isset($data['email']) ? $data['email'] : '',
+				'comment_author_url'	=> $url,
+				'comment_content'		=> $content
+			);
+			
+			// Check it!
+			if ($this->is_spam())
+			{
+				// Exit if spam
+				$this->abort(TRUE);
+			}
+		}
+		
+		//this needs to be returned either way
+		return $last_call;
+	}
+	//END check_freeform_entry
+
+
 	// --------------------------------
 	//	Check input
 	// -------------------------------- 
@@ -460,7 +536,8 @@ class Low_nospam_check
 			'forum_submit_post_start'		=> 'check_forum_post',
 			'gallery_insert_new_comment'	=> 'check_gallery_comment',
 			'edit_wiki_article_end'			=> 'check_wiki_article',
-			'member_member_register_start'	=> 'check_member_registration'
+			'member_member_register_start'	=> 'check_member_registration',
+			'freeform_module_validate_end'	=> 'check_freeform_entry'
 		);
 		
 		// insert hooks and methods
