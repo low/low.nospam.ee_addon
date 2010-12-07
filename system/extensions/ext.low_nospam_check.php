@@ -72,6 +72,7 @@ class Low_nospam_check
 			'check_trackbacks'			=> array('r', array('y' => "yes", 'n' => "no"), 'y'),
 			'check_member_registrations'=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
 			'check_freeform_entries'	=> array('r', array('y' => "yes", 'n' => "no"), 'y'),
+			'check_ss_user_register'	=> array('r', array('y' => "yes", 'n' => "no"), 'y'),
 			'moderate_if_unreachable'	=> array('r', array('y' => "yes", 'n' => "no"), 'y')
 		);
 		
@@ -339,14 +340,14 @@ class Low_nospam_check
 
     // --------------------------------------------------------------------
 	/**
-	 * Check freeform new entry
+	 * Check Solspace Freeform new entry
 	 * 
 	 * @access public
 	 * @param  (array) 	Data passed in from extension
 	 * @return (array)	Data passed back to freeform
 	 */
 	
-	public function check_freeform_entry($data)
+	public function check_solspace_freeform_entry($data)
 	{
 		global $EXT, $IN, $SESS;
 		
@@ -409,7 +410,76 @@ class Low_nospam_check
 		//this needs to be returned either way
 		return $last_call;
 	}
-	//END check_freeform_entry
+	//END check_solspace_freeform_entry
+
+
+    // --------------------------------------------------------------------
+	/**
+	 * Check Solspace User Member Register
+	 * 
+	 * @access public
+	 * @param  (array) 	Data passed in from extension
+	 * @return (array)	Data passed back to freeform
+	 */
+	
+	public function check_solspace_user_register($obj, $errors)
+	{
+		global $EXT, $IN, $SESS;
+		
+		$last_call = ( isset( $EXT->last_call ) AND is_array($EXT->last_call) ) ? $EXT->last_call : $errors;
+		
+		// check settings to see if comment needs to be verified
+		if ($this->settings['check_ss_user_register'] == 'y')
+		{
+			// Don't send these values to the service
+			$ignore = array(
+				'password', 
+				'password_confirm', 
+				'rules', 
+				'email' , 
+				'url', 
+				'username',
+				'XID', 
+				'ACT', 
+				'RET', 
+				'FROM', 
+				'site_id', 
+				'accept_terms',
+				'captcha'
+			);
+			
+			// Init content var
+			$content = '';
+			
+			// Loop through posted data, add to content var
+			foreach ($_POST AS $key => $val)
+			{
+				if (in_array($key, $ignore)) continue;
+				
+				$content .= $val . "\n";
+			}
+			
+			$this->input = array(
+				'user_ip'				=> $SESS->userdata['ip_address'],
+				'user_agent'			=> $SESS->userdata['user_agent'],
+				'comment_author'		=> $IN->GBL('username'),
+				'comment_author_email'	=> $IN->GBL('email'),
+				'comment_author_url'	=> $IN->GBL('url'),
+				'comment_content'		=> $content
+			);
+			
+			// Check it!
+			if ($this->is_spam())
+			{
+				// Exit if spam
+				$this->abort(TRUE);
+			}
+		}
+		
+		//this needs to be returned either way
+		return $last_call;
+	}
+	//END check_solspace_user_entry
 
 
 	// --------------------------------
@@ -537,7 +607,8 @@ class Low_nospam_check
 			'gallery_insert_new_comment'	=> 'check_gallery_comment',
 			'edit_wiki_article_end'			=> 'check_wiki_article',
 			'member_member_register_start'	=> 'check_member_registration',
-			'freeform_module_validate_end'	=> 'check_freeform_entry'
+			'freeform_module_validate_end'	=> 'check_solspace_freeform_entry',
+			'user_register_error_checking'	=> 'check_solspace_user_register'
 		);
 		
 		// insert hooks and methods
