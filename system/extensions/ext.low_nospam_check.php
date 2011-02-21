@@ -71,8 +71,8 @@ class Low_nospam_check
 			'check_wiki_articles'		=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
 			'check_trackbacks'			=> array('r', array('y' => "yes", 'n' => "no"), 'y'),
 			'check_member_registrations'=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
-			'check_freeform_entries'	=> array('r', array('y' => "yes", 'n' => "no"), 'y'),
-			'check_ss_user_register'	=> array('r', array('y' => "yes", 'n' => "no"), 'y'),
+			'check_freeform_entries'	=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
+			'check_ss_user_register'	=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
 			'moderate_if_unreachable'	=> array('r', array('y' => "yes", 'n' => "no"), 'y')
 		);
 		
@@ -715,6 +715,66 @@ class Low_nospam_check
 			); // end db->query
 		}
 	    
+		//--------------------------------------------  
+		//	add Solspace User and Freeform hooks
+		//--------------------------------------------
+		
+		if ($current < '1.1.0')
+		{			
+			// freeform
+			$DB->query(
+				$DB->insert_string(
+					'exp_extensions', array(
+						'extension_id'	=> '',
+						'class'			=> __CLASS__,
+						'method'		=> 'check_solspace_freeform_entry',
+						'hook'			=> 'freeform_module_validate_end',
+						'settings'		=> $new_settings,
+						'priority'		=> 1,
+						'version'		=> $this->version,
+						'enabled'		=> 'y'
+					)
+				)
+			); // end db->query
+			
+			// user
+			$DB->query(
+				$DB->insert_string(
+					'exp_extensions', array(
+						'extension_id'	=> '',
+						'class'			=> __CLASS__,
+						'method'		=> 'check_solspace_user_register',
+						'hook'			=> 'user_register_error_checking',
+						'settings'		=> $new_settings,
+						'priority'		=> 1,
+						'version'		=> $this->version,
+						'enabled'		=> 'y'
+					)
+				)
+			); // end db->query
+			
+			//--------------------------------------------  
+			//	default settings
+			//--------------------------------------------
+			
+			// Get current settings
+			$query = $DB->query("SELECT settings FROM exp_extensions WHERE class = '".__CLASS__."' LIMIT 1");
+			
+			if ($query->num_rows > 0)
+			{
+				$settings = unserialize($query->row['settings']);
+
+				// Add defaults to settings
+				$settings['check_freeform_entries'] = 'n';
+				$settings['check_ss_user_register'] = 'n';
+
+				$new_settings = $DB->escape_str(serialize($settings));
+
+				// save new settings to DB
+				$DB->query("UPDATE exp_extensions SET settings = '{$new_settings}' WHERE class = '".__CLASS__."'");
+			}
+		}
+	
 		// default: update version number
 		$DB->query("UPDATE exp_extensions SET version = '{$this->version}' WHERE class = '".__CLASS__."'");
 	}
