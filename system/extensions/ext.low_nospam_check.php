@@ -71,6 +71,8 @@ class Low_nospam_check
 			'check_wiki_articles'		=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
 			'check_trackbacks'			=> array('r', array('y' => "yes", 'n' => "no"), 'y'),
 			'check_member_registrations'=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
+			'check_freeform_entries'	=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
+			'check_ss_user_register'	=> array('r', array('y' => "yes", 'n' => "no"), 'n'),
 			'moderate_if_unreachable'	=> array('r', array('y' => "yes", 'n' => "no"), 'y')
 		);
 		
@@ -336,6 +338,154 @@ class Low_nospam_check
 	// END check_member_registration
 
 
+    // --------------------------------------------------------------------
+	/**
+	 * Check Solspace Freeform new entry
+	 * 
+	 * @access public
+	 * @param  (array) 	Data passed in from extension
+	 * @return (array)	Data passed back to freeform
+	 */
+	
+	public function check_solspace_freeform_entry($data)
+	{
+		global $EXT, $IN, $SESS;
+		
+		$last_call = ( isset( $EXT->last_call ) AND is_array($EXT->last_call) ) ? $EXT->last_call : $data;
+				
+		// check settings to see if comment needs to be verified
+		if ($this->settings['check_freeform_entries'] == 'y')
+		{
+			// Don't send these values to the service
+			$ignore = array(
+				'accept_terms',
+				'author_id',
+				'edit_date',
+				'email' , 
+				'entry_date',
+				'form_name',
+				'FROM', 
+				'group_id',
+				'name',
+				'password', 
+				'password_confirm', 
+				'rules', 
+				'site_id', 
+				'url', 
+				'username',
+				'website',
+			);
+			
+			// Init content var
+			$content = '';
+			
+			// Loop through posted data, add to content var
+			foreach ($data AS $key => $val)
+			{
+				if (in_array($key, $ignore)) continue;
+				
+				$content .= $val . "\n";
+			}
+			
+			//url could come from a lot of places
+			$url = isset($data['url']) ? $data['url'] : (isset($data['website']) ? $data['website'] :  $IN->GBL('url'));
+			
+			$this->input = array(
+				'user_ip'				=> $SESS->userdata['ip_address'],
+				'user_agent'			=> $SESS->userdata['user_agent'],
+				'comment_author'		=> (isset($SESS->userdata['username']) ? $SESS->userdata['username'] : ''),
+				'comment_author_email'	=> isset($data['email']) ? $data['email'] : '',
+				'comment_author_url'	=> $url,
+				'comment_content'		=> $content
+			);
+			
+			// Check it!
+			if ($this->is_spam())
+			{
+				// Exit if spam
+				$this->abort(TRUE);
+			}
+		}
+		
+		//this needs to be returned either way
+		return $last_call;
+	}
+	//END check_solspace_freeform_entry
+
+
+    // --------------------------------------------------------------------
+	/**
+	 * Check Solspace User Member Register
+	 * 
+	 * @access public
+	 * @param  (object) current instance of user
+	 * @param  (array) 	array of errors already found
+	 * @return (array)	Data passed back to freeform
+	 */
+	
+	public function check_solspace_user_register($obj, $errors)
+	{
+		global $EXT, $IN, $SESS;
+		
+		$last_call = ( isset( $EXT->last_call ) AND is_array($EXT->last_call) ) ? $EXT->last_call : $errors;
+		
+		//if there are already errors, we dont need to bother checking
+		if ( ! empty($last_call)) return $last_call;
+		
+		// check settings to see if comment needs to be verified
+		if ($this->settings['check_ss_user_register'] == 'y')
+		{
+			// Don't send these values to the service
+			$ignore = array(
+				'password', 
+				'password_confirm', 
+				'rules', 
+				'email' , 
+				'url', 
+				'username',
+				'XID', 
+				'ACT', 
+				'RET', 
+				'FROM', 
+				'site_id', 
+				'accept_terms',
+				'captcha'
+			);
+			
+			// Init content var
+			$content = '';
+			
+			// Loop through posted data, add to content var
+			foreach ($_POST AS $key => $val)
+			{
+				if (in_array($key, $ignore)) continue;
+				
+				$content .= $val . "\n";
+			}
+			
+			$this->input = array(
+				'user_ip'				=> $SESS->userdata['ip_address'],
+				'user_agent'			=> $SESS->userdata['user_agent'],
+				'comment_author'		=> $IN->GBL('username'),
+				'comment_author_email'	=> $IN->GBL('email'),
+				'comment_author_url'	=> $IN->GBL('url'),
+				'comment_content'		=> $content
+			);
+			
+			// Check it!
+			if ($this->is_spam())
+			{
+				// Exit if spam
+				$this->abort(TRUE);
+			}
+		}
+		
+		//this needs to be returned either way
+		return $last_call;
+	}
+	//END check_solspace_user_entry
+
+
 	// --------------------------------
 	//	Check input
 	// -------------------------------- 
@@ -460,7 +610,9 @@ class Low_nospam_check
 			'forum_submit_post_start'		=> 'check_forum_post',
 			'gallery_insert_new_comment'	=> 'check_gallery_comment',
 			'edit_wiki_article_end'			=> 'check_wiki_article',
-			'member_member_register_start'	=> 'check_member_registration'
+			'member_member_register_start'	=> 'check_member_registration',
+			'freeform_module_validate_end'	=> 'check_solspace_freeform_entry',
+			'user_register_error_checking'	=> 'check_solspace_user_register'
 		);
 		
 		// insert hooks and methods
@@ -563,6 +715,66 @@ class Low_nospam_check
 			); // end db->query
 		}
 	    
+		//--------------------------------------------  
+		//	add Solspace User and Freeform hooks
+		//--------------------------------------------
+		
+		if ($current < '1.1.0')
+		{			
+			// freeform
+			$DB->query(
+				$DB->insert_string(
+					'exp_extensions', array(
+						'extension_id'	=> '',
+						'class'			=> __CLASS__,
+						'method'		=> 'check_solspace_freeform_entry',
+						'hook'			=> 'freeform_module_validate_end',
+						'settings'		=> $new_settings,
+						'priority'		=> 1,
+						'version'		=> $this->version,
+						'enabled'		=> 'y'
+					)
+				)
+			); // end db->query
+			
+			// user
+			$DB->query(
+				$DB->insert_string(
+					'exp_extensions', array(
+						'extension_id'	=> '',
+						'class'			=> __CLASS__,
+						'method'		=> 'check_solspace_user_register',
+						'hook'			=> 'user_register_error_checking',
+						'settings'		=> $new_settings,
+						'priority'		=> 1,
+						'version'		=> $this->version,
+						'enabled'		=> 'y'
+					)
+				)
+			); // end db->query
+			
+			//--------------------------------------------  
+			//	default settings
+			//--------------------------------------------
+			
+			// Get current settings
+			$query = $DB->query("SELECT settings FROM exp_extensions WHERE class = '".__CLASS__."' LIMIT 1");
+			
+			if ($query->num_rows > 0)
+			{
+				$settings = unserialize($query->row['settings']);
+
+				// Add defaults to settings
+				$settings['check_freeform_entries'] = 'n';
+				$settings['check_ss_user_register'] = 'n';
+
+				$new_settings = $DB->escape_str(serialize($settings));
+
+				// save new settings to DB
+				$DB->query("UPDATE exp_extensions SET settings = '{$new_settings}' WHERE class = '".__CLASS__."'");
+			}
+		}
+	
 		// default: update version number
 		$DB->query("UPDATE exp_extensions SET version = '{$this->version}' WHERE class = '".__CLASS__."'");
 	}
