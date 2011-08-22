@@ -105,6 +105,12 @@ $L = array(
 "check_member_registrations" =>
 "Check member registrations?",
 
+"check_freeform_entries"=>
+"Check Solspace Freeform new entries?",
+
+"check_ss_user_register"=>
+"Check Solspace User member registration?",
+
 "moderate_if_unreachable" =>
 "Always flag as spam if service is unreachable?",
 
