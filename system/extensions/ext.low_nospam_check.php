@@ -21,7 +21,7 @@ class Low_nospam_check
 	var $settings		= array();
 
 	var $name			= 'Low NoSpam';
-	var $version		= '1.0.5';
+	var $version		= '1.1.0';
 	var $description	= 'Anti-spam utility using online services like Akismet and TypePad AntiSpam';
 	var $settings_exist = 'y';
 	var $docs_url		= '';
@@ -38,7 +38,7 @@ class Low_nospam_check
 	{
 		global $LANG;
 		
-		$LANG->fetch_language_file('low_nospam');
+		// $LANG->fetch_language_file('low_nospam');
 		
 		$this->settings = $settings;
 	}
